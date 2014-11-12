@@ -1,11 +1,13 @@
-/*
+﻿/*
   Função: fn_configura_notas_etec - configura o quadro de notas em um curso e-Tec
   Parâmetros: ID do curso
   alterações:
-  07/11/2014 (Mauro) - inclusão de verificação para só configurar cursos que estejam nas categorias de cursos reais do e-Tec  
+  07/11/2014 (Mauro)
+    - inclusão de verificação para só configurar cursos que estejam nas categorias de cursos reais do e-Tec  
+    - Deixa escondidas (hidden) as médias reais
+  11/11/2014 (mauro) - alteração teste para commit no github
 */
-﻿drop function fn_configura_notas_etec(id_curso integer);
-
+-- DROP FUNCTION fn_configura_notas_etec(id_curso integer)
 CREATE or REPLACE FUNCTION fn_configura_notas_etec(id_curso integer) returns void as $$
 --DO
 --$do$
@@ -58,8 +60,7 @@ BEGIN
 
 	-- se a categoria do curso indicado não é dos cursos e-Tec, aborta configuração
 	if not exists (select 1 from MDL_COURSE where ID=id_curso and CATEGORY in (select ID from categorias)) then
-		select 'CURSO NÃO É DA CATEGORIA e-Tec!';
-		return;
+		return;		-- 'CURSO NÃO É DA CATEGORIA e-Tec!';
 	end if;
 
 	--- =========== CRIA CATEGORIAS DE NOTAS =============
@@ -153,13 +154,11 @@ BEGIN
 
 	----- CRIA ITENS DE NOTA MANUAIS PARA MEDIAS
 
-	-- LEMBRETE: deixar oculta as médias reais (HIDDEN=1)
-
-	-- Media parcial real (media_pr)
+	-- Media parcial real (media_pr) (fica escondida com HIDDEN=1)
 	if not exists (select 1 from MDL_GRADE_ITEMS where COURSEID=id_curso and IDNUMBER='media_pr') then
-		insert into MDL_GRADE_ITEMS (COURSEID,CATEGORYID,ITEMNAME,ITEMTYPE,ITEMNUMBER,IDNUMBER,ITEMINFO,CALCULATION)
+		insert into MDL_GRADE_ITEMS (COURSEID,CATEGORYID,ITEMNAME,ITEMTYPE,ITEMNUMBER,IDNUMBER,ITEMINFO,CALCULATION,HIDDEN)
 		values (id_curso,id_cat_raiz,'Média parcial real','manual',0,'media_pr','Média parcial sem arredondamento',
-			'=(##gi'||id_media_OL||'##*3+##gi'||id_media_pres||'##*7)/10');
+			'=(##gi'||id_media_OL||'##*3+##gi'||id_media_pres||'##*7)/10',1);
 	end if;
 	id_media_pr:=(select ID from MDL_GRADE_ITEMS where COURSEID=id_curso and IDNUMBER='media_pr');
 	--raise notice 'id_cat_online=%  id_cat_presencial=%  id_media_pr=%',id_cat_online,id_cat_presencial,id_media_pr;
@@ -181,13 +180,13 @@ BEGIN
 	end if;
 	id_pftmp:=(select ID from MDL_GRADE_ITEMS where COURSEID=id_curso and IDNUMBER='pftmp');
 
-	-- media real após prova final (mapf1)
+	-- media real após prova final (mapf1) (fica escondida com HIDDEN=1)
 	-- FALTA: ajustar fórmula (depende da existência da atividade offline da prova final)
 	--        por enquanto criei um item de nota chamado 'pftmp' para poder criar as formulas dependentes
 	if not exists (select 1 from MDL_GRADE_ITEMS where COURSEID=id_curso and IDNUMBER='mapf1') then
-		insert into MDL_GRADE_ITEMS (COURSEID,CATEGORYID,ITEMNAME,ITEMTYPE,ITEMNUMBER,IDNUMBER,ITEMINFO,CALCULATION)
+		insert into MDL_GRADE_ITEMS (COURSEID,CATEGORYID,ITEMNAME,ITEMTYPE,ITEMNUMBER,IDNUMBER,ITEMINFO,CALCULATION,HIDDEN)
 		values (id_curso,id_cat_raiz,'Média real após prova final','manual',0,'mapf1','Média após prova final, sem arredondamento',
-			'=(##gi'||id_media_par||'##+##gi'||id_pftmp||'##*2,5)/3*round(##gi'||id_media_par||'##/(3*2))*(1-round(##gi'||id_media_par||'##/(7*2)))');
+			'=(##gi'||id_media_par||'##+##gi'||id_pftmp||'##*2,5)/3*round(##gi'||id_media_par||'##/(3*2))*(1-round(##gi'||id_media_par||'##/(7*2)))',1);
 	end if;
 	id_mapf1:=(select ID from MDL_GRADE_ITEMS where COURSEID=id_curso and IDNUMBER='mapf1');
 
@@ -221,7 +220,7 @@ BEGIN
 	update MDL_GRADE_ITEMS set SORTORDER=vordem+5 where COURSEID=id_curso and IDNUMBER='mapf2';
 	
 
-	select 'CONFIGURAÇÃO EFETUADA!';
+	return;		-- 'CONFIGURAÇÃO EFETUADA!';
 	--return;		-- ('FIM');
 
 END;
@@ -229,3 +228,4 @@ END;
 --$do$
 
 $$ LANGUAGE plpgsql;
+
